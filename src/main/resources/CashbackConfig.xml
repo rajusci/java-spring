@@ -1,0 +1,28 @@
+<xml>
+<cashbacks>
+<cashback name='default'>
+<validations name='test'>			
+<validation>VDL_CUSTOMER_VALIDATION</validation>
+<validation>VDL_REDEMPTION_MERCHANT_VALIDATION</validation>
+<validation>VDL_BALANCE_VALIDATION</validation>
+<validation>VDL_SETTLEMENT_THRESHOLD_VALIDATION</validation>
+<validation>VDL_OTP_VADILATION</validation>
+</validations>
+<apicalls>
+					
+</apicalls>
+<notifications>
+<notification>NTF_CUSTOMER</notification>
+<notification>NTF_MERCHANT</notification>
+</notifications>
+
+               
+<rwdcurrency>RWD_SMART_POINTS</rwdcurrency>
+               
+<customerspiel>CASH_BACK_SUCCESS_SMS_STORE</customerspiel>
+<merchantspiel>CASH_BACK_SUCCESS_SMS_MERCHANT_STORE</merchantspiel>
+</cashback>
+			
+</cashbacks>
+        
+</xml>

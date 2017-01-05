@@ -1,0 +1,202 @@
+package com.inspirenetz.api.core.incustomization.drools;
+
+import com.inspirenetz.api.core.domain.*;
+import com.inspirenetz.api.core.dictionary.*
+import java.util.List;
+
+
+global CustomerHelper customerHelper;
+global LoyaltyEngineHelper loyaltyEngineHelper;
+global SalesHelper salesHelper;
+global TransactionHelper transactionHelper; 
+global CustomerReferralHelper customerReferralHelper;
+
+
+
+/**
+ * Function to get the points for referral tier.
+ * We will be storng the basePoints based on the amount of the sales
+ * and will apply the bonusPercent above it if applicable.
+ *
+ */
+function Integer getPointsForReferralTier(Double amount, Integer bonusPercent) {
+
+    // Variable holding the base percent
+    Integer basePoints = 0;
+
+    // Check the range of amount and set the base points
+    if ( amount >=2500000 && amount <= 4999999 ) {
+
+        basePoints = 10000;
+
+    } else if ( amount >= 5000000 && amount <= 7499999 ) {
+
+        basePoints = 15000;
+
+    } else if ( amount >= 7500000 && amount <= 9999999 ) {
+
+        basePoints = 20000;
+
+    } else if ( amount >= 10000000 && amount <= 14999999 ) {
+
+         basePoints = 25000;
+
+    } else if ( amount >= 15000000 && amount <= 19999999 ) {
+
+         basePoints = 40000;
+
+    } else if ( amount >= 20000000 && amount <= 24999999 ) {
+
+         basePoints = 60000;
+
+    } else if ( amount >= 25000000 && amount <= 29999999 ) {
+
+         basePoints = 80000;
+
+    } else if ( amount >= 30000000 && amount <= 39999999 ) {
+
+         basePoints = 100000;
+
+    } else if ( amount >= 40000000 ) {
+
+         basePoints = 150000;
+
+    }
+
+
+    // If the bonus percent is present, then calculate and add it to the base points
+    if ( bonusPercent > 0 ) {
+
+        // Calculate the percent
+        Integer bonusPoints = ( basePoints * bonusPercent ) / 100;
+
+        // Add the bonusPoints to the basePoints
+        basePoints += bonusPoints;
+
+    }
+
+
+    // Return the basePoints
+    return basePoints;
+
+}
+
+
+
+rule "Aparna Referrer rules"
+dialect "mvel"
+no-loop
+when
+
+    $lp: LoyaltyProgram()
+    $s : Sale()
+    $crp: CustomerRewardPoint()
+
+then
+
+    // Get the customer object
+    Customer customer = customerHelper.getCustomerInfo($s.getSalMerchantNo(),$s.getSalLoyaltyId());
+
+    // Get the referrer  for the customer
+    Customer referrer = customerReferralHelper.getReferrerCustomerForReferee(customer);
+
+     List customerReferralList = customerReferralHelper.getArrayList();
+
+    //check if the referrer is null
+    if( referrer != null){
+
+        //Get the referral list he has done
+        customerReferralList = customerReferralHelper.getCustomerReferralList(referrer);
+
+    }
+
+    boolean isAwarded = false;
+
+    if(customerReferralList != null && customerReferralList.size() > 0){
+
+        for(Object referralObj : customerReferralList){
+
+            CustomerReferral customerReferralObj = (CustomerReferral)referralObj;
+
+            if(customerReferralObj.getCsrLoyaltyId().equals(referrer.getCusLoyaltyId())){
+
+                //Check if the earned referee and the current referee are same
+                if(customerReferralObj.getCsrRefMobile().equals(customer.getCusMobile())){
+
+                     isAwarded = true;
+                }
+
+            }
+
+        }
+
+
+    }
+
+    boolean isFirstReferral = false;
+
+    // Store the count
+    int referralCount = 1;
+
+    // Variable holding the bonus percent
+    int bonusPercent = 0;
+
+    Integer pointsEarned = 0;
+
+
+    //check if the customer Referral list is null
+    if(customerReferralList == null){
+
+       // set isFirstreferral to true
+       isFirstReferral = true;
+
+       // Get the points
+       pointsEarned = getPointsForReferralTier($s.getSalAmount(),bonusPercent);
+
+       //get the customerReferral object and set earned status as true
+       customerReferralHelper.updateStatus(referrer,customer, pointsEarned);
+    }
+
+    if(!isAwarded && !isFirstReferral && customerReferralList != null){
+
+        //Iterate through referral list and get the total points for buns calculation.
+        for (Object referral : customerReferralList ){
+
+            //increment the referral count
+            referralCount= referralCount + 1;
+
+        }
+        // Calculate the bonus percent based on the number of referrals.
+        if ( referralCount > 2 && referralCount <= 4) {
+
+            bonusPercent = 25;
+
+        } else if ( referralCount > 4 && referralCount <=6 ) {
+
+            bonusPercent = 40;
+
+        } else if ( referralCount > 6) {
+
+            bonusPercent = 50;
+
+        }
+
+        // Get the points
+        pointsEarned = getPointsForReferralTier($s.getSalAmount(),bonusPercent);
+
+       //get the customerReferral object and set earned status as true and also save the points earned
+       customerReferralHelper.updateStatus(referrer,customer,pointsEarned);
+
+    }
+
+    System.out.println("Referral count : " + referralCount);
+    System.out.println("Bonus Percent  : " + bonusPercent);
+    System.out.println("Points Earned : " + pointsEarned);
+
+    // Set the value in the CustomerRewardPoint entity for the referrer
+    $crp.setTotalReferrerPoint(pointsEarned);
+
+    // Print the pointRewardData object
+    System.out.println("CustomerRewardPoint " +$crp.toString());
+
+end

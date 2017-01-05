@@ -1,0 +1,85 @@
+package com.inspirenetz.api.core.incustomization.drools;
+
+import com.inspirenetz.api.core.domain.*;
+import com.inspirenetz.api.core.dictionary.*;
+import java.util.List
+import java.util.ArrayList
+import java.sql.Date;
+
+
+global CustomerHelper customerHelper;
+global LoyaltyEngineHelper loyaltyEngineHelper;
+global SalesHelper salesHelper;
+global TransactionHelper transactionHelper;
+global CustomerReferralHelper customerReferralHelper;
+
+/**
+ * Function to get the points based on spent
+ * We will be storng the basePoints based on the amount of the sales
+ *
+ */
+function Integer getPointsForAwarding(Double amount) {
+
+    // Variable holding the base percent
+    Integer basePoints = 0;
+
+    // Check the range of amount and set the base points
+    if ( amount >=10000 ) {
+
+        basePoints = 100;
+
+    } else {
+
+        basePoints = 0;
+
+    }
+
+    return basePoints;
+
+}
+
+rule "Rules to award points based on spent"
+dialect "mvel"
+no-loop
+when
+    $lp: LoyaltyProgram()
+    $s: Sale()
+    $crp: CustomerRewardPoint()
+
+then
+
+   //check if the customer is awarded by this program
+   boolean isAwarded = transactionHelper.checkTransactionsDone($s.getSalLoyaltyId(),$s.getSalMerchantNo(),$lp.getPrgProgramNo());
+
+   // check if is awarded
+   if(isAwarded){
+
+        //Set reward point as 0
+        $crp.setTotalRewardPoint(0);
+
+        System.out.println("Award points on total spent for past 6 months : customer is already awarded");
+
+   } else {
+
+      //Get the total amount spent on last six months
+      Double totalAmount = salesHelper.getTotalAmountSpent($s.getSalLoyaltyId(),$s.getSalMerchantNo(),$s.getSalDate(),-6);
+
+      //Get the points to be awarded
+      Integer points = getPointsForAwarding(totalAmount);
+
+      //set total reward point
+      $crp.setTotalRewardPoint(points);
+
+      System.out.println("Award points on total spent for past 6 months :Awarding " +points+" points." );
+   }
+
+ end
+
+
+
+
+
+
+
+
+

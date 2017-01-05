@@ -1,0 +1,27 @@
+package com.inspirenetz.api.core.auth;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+/**
+ * Created by ffl on 04/06/14.
+ */
+public class CustomAccessDeniedHandler implements AccessDeniedHandler{
+    @Override
+    public void handle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, AccessDeniedException e) throws IOException, ServletException {
+        httpServletResponse.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        httpServletResponse.setStatus(HttpStatus.FORBIDDEN.value());
+        PrintWriter writer = httpServletResponse.getWriter();
+        writer.print("Access denied");
+        writer.flush();
+        writer.close();
+    }
+}

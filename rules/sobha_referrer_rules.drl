@@ -1,0 +1,278 @@
+package com.inspirenetz.api.core.incustomization.drools;
+
+import com.inspirenetz.api.core.domain.*;
+import com.inspirenetz.api.core.dictionary.*;
+import java.util.List;
+
+
+global CustomerHelper customerHelper;
+global LoyaltyEngineHelper loyaltyEngineHelper;
+global SalesHelper salesHelper;
+global TransactionHelper transactionHelper;
+global CustomerReferralHelper customerReferralHelper;
+
+
+
+/**
+Function to get the points for referral based on the product
+*/
+function Integer getPointsForReferralProduct(String prodCode){
+
+    System.out.println("Product identified" + prodCode);
+
+    //variable holding the points
+    Integer points = 0;
+
+    String prdCode1 = "DA1BHK";
+    String prdCode2 = "DA2BHKR";
+
+    //check the product and set the points
+    if (prodCode.equals(prdCode1)){
+
+        points = 15000;
+
+    } else if (prodCode.equals(prdCode2)){
+
+        points = 25000;
+
+    }
+
+    //Return the points
+    return points;
+
+}
+
+/**
+Function to calculate the bonus points
+*/
+
+function Integer getBonusPoints(Integer bonusPercent, Integer pointsEarned){
+
+    System.out.println("Bonus percent:" +bonusPercent+ "Points earned"+pointsEarned);
+
+    // If the bonus percent is present, then calculate and add it to the base points
+    if ( bonusPercent > 0 ){
+
+    //calculate the points based on bonus percent
+    Integer bonusPoints = (pointsEarned*bonusPercent) / 100;
+
+    System.out.println("Bonus points:" +bonusPoints);
+
+    //Return the points
+    return bonusPoints;
+
+    } else {
+
+    return 0;
+
+    }
+}
+
+
+rule "Sobha Referrer rules"
+dialect "mvel"
+no-loop
+when
+    $lp: LoyaltyProgram()
+    $s: Sale()
+    $crp: CustomerRewardPoint()
+    $cr : CustomerReferral()
+
+then
+
+    //Get the customer object
+    Customer customer = customerHelper.getCustomerInfo($s.getSalMerchantNo(),$s.getSalLoyaltyId());
+
+    //Get the referrer for the customer
+    Customer referrer = customerReferralHelper.getReferrerCustomerForReferee(customer);
+
+    List customerReferralList = customerReferralHelper.getArrayList();
+
+    //check if the referrer is null
+    if( referrer != null){
+
+        //Get the referral list he has done
+        customerReferralList = customerReferralHelper.getCustomerReferralList(referrer);
+
+    }
+
+    boolean isAwarded = false;
+
+    if(customerReferralList != null && customerReferralList.size() > 0){
+
+        for(Object referralObj : customerReferralList){
+
+            CustomerReferral customerReferralObj = (CustomerReferral)referralObj;
+
+            if(customerReferralObj.getCsrLoyaltyId().equals(referrer.getCusLoyaltyId())){
+
+                if(customerReferralObj.getCsrRefMobile().equals(customer.getCusMobile())){
+
+                     isAwarded = true;
+                }
+
+            }
+
+        }
+
+
+    }
+
+    boolean isFirstReferral = false;
+
+    //variable holding the referralCount
+    int referralCount =1;
+
+    //variable holding the points corresponding to the current sale
+    int actualPoints = 0;
+
+    int pointsEarned = 0;
+
+    int bonusPointsEarned = 0;
+
+    // Variable holding the bonus percent
+    int bonusPercent = 0;
+
+    //check if the customer Referral list is null
+    if(customerReferralList == null){
+
+       // set isFirstreferral to true
+       isFirstReferral = true;
+
+       //get the list of products purchased by the referee and award points based on purchased product
+       List productList1 = salesHelper.getPurchasedProduct(referrer,customer);
+
+       // check if product list contains DA1BHK or DA2BHKR
+       if(productList1.contains("DA2BHKR")){
+
+            //get the points for the product
+            actualPoints = getPointsForReferralProduct("DA2BHKR");
+
+        // check if product list contains DA1BHK or DA2BHKR
+       } else if(productList1.contains("DA1BHK")){
+
+            //get the points for the product
+            actualPoints = getPointsForReferralProduct("DA1BHK");
+
+       }
+
+       //get the customerReferral object and set earned status as true
+       customerReferralHelper.updateStatus(referrer,customer, actualPoints);
+
+
+    }
+
+    //set the total referrer point
+    $crp.setTotalReferrerPoint((double)actualPoints);
+
+    //check if it is first referral and customer referral is not null
+     if(!isAwarded && !isFirstReferral && customerReferralList != null){
+
+         //get the product list
+         List productList = salesHelper.getPurchasedProduct(referrer, customer);
+
+         //check if the sale loyalty id and check the product and award based on product
+         if ($s.getSalLoyaltyId().equals(customer.getCusMobile())){
+
+              if(productList.contains("DA2BHKR")){
+
+                  actualPoints = getPointsForReferralProduct("DA2BHKR");
+
+              } else if(productList.contains("DA1BHK")){
+
+                  actualPoints = getPointsForReferralProduct("DA1BHK");
+
+                       System.out.println("Drools not null DA1BHK"  +  actualPoints);
+              }
+
+         }
+
+         //store the points of the current customer
+         pointsEarned += actualPoints;
+
+         double pointsGiven = 0.0;
+
+        //get the customer refferral list with earned status as true
+         customerReferralList = customerReferralHelper.getCustomerReferralList(referrer);
+
+            //Iterate through referral list and get the total points for buns calculation.
+            for (Object referral : customerReferralList ){
+
+                   CustomerReferral customerReferral =(CustomerReferral) referral;
+
+                   pointsGiven += customerReferral.getCsrPoints();
+
+                   //increment the referral count
+                   referralCount= referralCount + 1;
+
+                   System.out.println("referral count :"+ referralCount);
+            }
+
+
+         //get the customerReferral object and set earned status as true and also save the points earned
+         customerReferralHelper.updateStatus(referrer,customer,actualPoints);
+
+         pointsEarned = (int)pointsGiven + actualPoints;
+
+         //set the bonus percent based on referral count
+         if (referralCount==2){
+
+             bonusPercent = 15;
+
+             // get the bonus points earned
+             bonusPointsEarned = getBonusPoints(bonusPercent,pointsEarned);
+
+         }else if (referralCount ==3){
+
+            bonusPercent =20;
+
+            // get the bonus points earned
+            bonusPointsEarned = getBonusPoints(bonusPercent,pointsEarned);
+
+            //if referral count is 3 then reduce the bonus points awarded for last
+            int bonusGiven = getBonusPoints(15,(int)pointsGiven);
+
+
+            System.out.println(" bonus Given : " + bonusGiven);
+
+            bonusPointsEarned -= bonusGiven;
+
+         }
+
+
+
+     }
+
+     //add the bonus points to the base point
+     Integer totalPoints= actualPoints + bonusPointsEarned;
+
+
+
+     System.out.println("Referral count :" + referralCount);
+
+     System.out.println("Bonus points : " + bonusPointsEarned);
+
+     System.out.println("Total Points : " + pointsEarned);
+
+
+
+    //set the value in the customerRewardPoint entity for the referrer
+     $crp.setTotalRefereePoint((double)actualPoints);
+
+     //set the value in the customerRewardPoint entity for the referrer
+     $crp.setTotalReferrerPoint(totalPoints);
+
+
+     // Print the pointRewardData object
+     System.out.println("CustomerRewardPoint " +$crp.toString());
+
+ end
+
+
+
+
+
+
+
+
+
